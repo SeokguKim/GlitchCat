@@ -106,6 +106,7 @@ def main(my_file):
                     
                     if len(cur_msg.split()) < 3:
                         continue
+
                     new_command = cur_msg.split()[1]
                     new_response = ' '.join(cur_msg.split()[2:])
                     commands[new_command] = new_response
@@ -119,13 +120,16 @@ def main(my_file):
                     new_chat_input.send_keys('명령어가 추가되었습니다: ' + new_command + ' -> ' + new_response)
                     chat_btn = driver.find_element(By.CLASS_NAME, 'live_chatting_input_send_button__8KBrn')
                     chat_btn.click()
-                     
+                    
+                    break
+             
                 elif cur_command == "!삭제":
                     if cur_user not in moderator:
                         continue
 
                     if len(cur_msg.split()) < 2:
                         continue
+
                     del_command = cur_msg.split()[1]
                     if del_command in commands:
                         del commands[del_command]
@@ -146,6 +150,9 @@ def main(my_file):
                         new_chat_input.send_keys('삭제할 명령어가 존재하지 않습니다: ' + del_command)
                         chat_btn = driver.find_element(By.CLASS_NAME, 'live_chatting_input_send_button__8KBrn')
                         chat_btn.click()
+                    
+                    break
+
                 elif cur_command in commands:
                     chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                     chat_input.click()
@@ -153,6 +160,9 @@ def main(my_file):
                     new_chat_input.send_keys(commands[cur_command])
                     chat_btn = driver.find_element(By.CLASS_NAME, 'live_chatting_input_send_button__8KBrn')
                     chat_btn.click()
+
+                    break
+                
             prv_chat = chat
         time.sleep(5)
 
