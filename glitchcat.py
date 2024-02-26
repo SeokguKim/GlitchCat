@@ -9,8 +9,20 @@ import sys
 import os
 import time
 import threading
+import requests
+if sys.platform == 'win32':
+    import win_unicode_console
+    win_unicode_console.enable()
 
-def get_input():
+def my_exit(exit_code): # Exit the program and disable the unicode console if it is enabled
+    if sys.platform == 'win32':
+        win_unicode_console.disable()
+    sys.exit(exit_code)
+    if exit_code == 1: # If the exit code is 1, close the program
+        if input_th.is_alive():
+            input_th.join()
+
+def get_input(): # Get the user input and start a new thread if the input is not 'q'
     global flag
     user_input = input()
     if user_input == 'q':
@@ -18,7 +30,7 @@ def get_input():
     else:
         threading.Thread(target=get_input).start()
 
-def main(my_file):
+def main(my_file): # Main function
     global flag
     flag = True
     print('Initialing GlitchCat...') # GlitchCat is a chat bot for chzzk.naver.com
@@ -38,7 +50,7 @@ def main(my_file):
     moderator_file = os.path.join(os.path.dirname(my_file), 'moderators.csv')
     if not os.path.exists(moderator_file): # If the file does not exist, print an error message and exit the program
         print('Moderators file not found. Please create a file named "moderators.csv" in the same directory as this script.')
-        sys.exit(1)
+        my_exit(1)
     
     moderator_data = pandas.read_csv(moderator_file)
     for i in range(len(moderator_data)):
@@ -48,12 +60,12 @@ def main(my_file):
     auth_file = os.path.join(os.path.dirname(my_file), 'chzzk_auth.csv')
     if not os.path.exists(auth_file): # If the file does not exist, print an error message and exit the program
         print('Auth file not found. Please create a file named "chzzk_auth.csv" in the same directory as this script.')
-        sys.exit(1)
+        my_exit(1)
 
     auth_data = pandas.read_csv(auth_file, nrows=1)
     if auth_data.empty: # If the file is empty, print an error message and exit the program
         print('Auth file is empty. Please fill in the required fields.')
-        sys.exit(1)
+        my_exit(1)
 
     chzzk_uid = auth_data['chzzk_uid'][0]
     bot_id = auth_data['bot_id'][0]
@@ -62,6 +74,7 @@ def main(my_file):
     print('Loading chat...') # Open the chat page
     dest_ch = 'https://chzzk.naver.com/live/' + chzzk_uid + '/chat'
     naver_login = 'https://nid.naver.com/nidlogin.login'
+    naver_main = 'https://www.naver.com/'
 
     driver = webdriver.Chrome()
     driver.get(naver_login)
@@ -73,10 +86,18 @@ def main(my_file):
     driver.find_element(By.CSS_SELECTOR, '#pw').send_keys(Keys.CONTROL, 'v')
     pyperclip.copy('')
     driver.find_element(By.XPATH,'//*[@id="log.login"]').click()
-    time.sleep(1)
-    if driver.current_url == naver_login: # If the login fails, print an error message and exit the program
+    
+    while driver.current_url != naver_main:
+        print('Please manually log in to Naver and go to the Naver main page...')
+        time.sleep(5)
+    time.sleep(2)
+
+    try:
+        driver.find_element(By.CSS_SELECTOR, '[class="MyView-module__desc_email___JwAKa"] ')
+    except:
         print('Login failed. Please check your ID and password.')
-        sys.exit(1)
+        driver.quit()
+        my_exit(1)
 
     driver.get(dest_ch)
 
@@ -85,14 +106,22 @@ def main(my_file):
 
     prv_chat = []
     while flag:
-        bs = BeautifulSoup(driver.page_source, 'html.parser')
-        chat = bs.select('button.live_chatting_message_wrapper__xpYre')
-        time.sleep(1)
-
-        if prv_chat == []:
+        try:
+            bs = BeautifulSoup(driver.page_source, 'html.parser')
+            chat = bs.select('button.live_chatting_message_wrapper__xpYre')
+            time.sleep(1)
+        except:
+            print('An error occurred while getting the chat. Please check your internet connection.')
+            try:
+                driver.quit()
+            except:
+                pass
+            my_exit(1)
+        
+        if prv_chat == []: # If there is no previous chat, set the previous chat to the current chat
             prv_chat = chat
             continue
-        
+
         if chat != prv_chat: # If there is a new chat, check if it is a command
             for i in range(len(chat) - len(prv_chat), 0, -1): # Check the new chat from the end
                 cur_chat = chat[-i]
@@ -118,11 +147,10 @@ def main(my_file):
                     chat_input.click()
                     new_chat_input = driver.find_element(By.CLASS_NAME, 'live_chatting_input_input__2F3Et')
                     new_chat_input.send_keys('명령어가 추가되었습니다: ' + new_command + ' -> ' + new_response)
-                    chat_btn = driver.find_element(By.CLASS_NAME, 'live_chatting_input_send_button__8KBrn')
-                    chat_btn.click()
+                    new_chat_input.send_keys(Keys.ENTER)
                     
                     break
-             
+            
                 elif cur_command == "!삭제":
                     if cur_user not in moderator:
                         continue
@@ -141,15 +169,14 @@ def main(my_file):
                         chat_input.click()
                         new_chat_input = driver.find_element(By.CLASS_NAME, 'live_chatting_input_input__2F3Et')
                         new_chat_input.send_keys('명령어가 삭제되었습니다: ' + del_command)
-                        chat_btn = driver.find_element(By.CLASS_NAME, 'live_chatting_input_send_button__8KBrn')
-                        chat_btn.click()
+                        new_chat_input.send_keys(Keys.ENTER)
+
                     else:
                         chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                         chat_input.click()
                         new_chat_input = driver.find_element(By.CLASS_NAME, 'live_chatting_input_input__2F3Et')
                         new_chat_input.send_keys('삭제할 명령어가 존재하지 않습니다: ' + del_command)
-                        chat_btn = driver.find_element(By.CLASS_NAME, 'live_chatting_input_send_button__8KBrn')
-                        chat_btn.click()
+                        new_chat_input.send_keys(Keys.ENTER)    
                     
                     break
 
@@ -158,8 +185,7 @@ def main(my_file):
                     chat_input.click()
                     new_chat_input = driver.find_element(By.CLASS_NAME, 'live_chatting_input_input__2F3Et')
                     new_chat_input.send_keys(commands[cur_command])
-                    chat_btn = driver.find_element(By.CLASS_NAME, 'live_chatting_input_send_button__8KBrn')
-                    chat_btn.click()
+                    new_chat_input.send_keys(Keys.ENTER)
 
                     break
                 
@@ -167,6 +193,11 @@ def main(my_file):
         time.sleep(5)
 
     print('Closing GlitchCat...') # The program is now closing
+    driver.quit()
+    if sys.platform == 'win32':
+        win_unicode_console.disable()
+    my_exit(0)
+        
 
 main_th = threading.Thread(target=main, args=(os.path.abspath(__file__),))
 input_th = threading.Thread(target=get_input)
