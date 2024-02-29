@@ -25,11 +25,12 @@ def my_exit(exit_code, uid): # Exit the program and disable the unicode console 
 def get_input(): # Get the user input
     global flags
     global gflag
-    user_input = input()
+    user_input = sys.stdin.readline().rstrip()
     if user_input == 'qa': # If the user input is 'qa', close all threads
         for uid in flags:
             flags[uid] = False
         gflag = False
+        return
     elif user_input.split()[0] == 'q': # If the user input is 'q', close the thread with the given UID
         if len(user_input.split()) > 1:
             uid = user_input.split()[1]
@@ -39,8 +40,8 @@ def get_input(): # Get the user input
                 print('Invalid UID or the thread has already been closed.')
         else:
             print('Invalid UID or the thread has already been closed.')
-    else: # If the user input is not 'qa' or 'q', print an error message
-        threading.Thread(target=get_input).start()
+    
+    threading.Thread(target=get_input).start()
 
 def listen_to_ch(uid, origin_file): # Main function
     global flags
