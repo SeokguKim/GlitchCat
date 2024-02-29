@@ -14,7 +14,7 @@ if sys.platform == 'win32':
     import win_unicode_console
     win_unicode_console.enable()
 
-def my_exit(exit_code): # Exit the program and disable the unicode console if it is enabled
+def my_exit(exit_code, uid): # Exit the program and disable the unicode console if it is enabled
     if sys.platform == 'win32':
         win_unicode_console.disable()
     sys.exit(exit_code)
@@ -22,59 +22,62 @@ def my_exit(exit_code): # Exit the program and disable the unicode console if it
         if input_th.is_alive():
             input_th.join()
 
-def get_input(): # Get the user input and start a new thread if the input is not 'q'
-    global flag
+def get_input(): # Get the user input
+    global flags
+    global gflag
     user_input = input()
-    if user_input == 'q':
-        flag = False
-    else:
+    if user_input == 'qa': # If the user input is 'qa', close all threads
+        for uid in flags:
+            flags[uid] = False
+        gflag = False
+    elif user_input.split()[0] == 'q': # If the user input is 'q', close the thread with the given UID
+        if len(user_input.split()) > 1:
+            uid = user_input.split()[1]
+            if uid in flags:
+                flags[uid] = False
+            else:
+                print('Invalid UID or the thread has already been closed.')
+        else:
+            print('Invalid UID or the thread has already been closed.')
+    else: # If the user input is not 'qa' or 'q', print an error message
         threading.Thread(target=get_input).start()
 
-def main(my_file): # Main function
-    global flag
-    flag = True
-    print('Initialing GlitchCat...') # GlitchCat is a chat bot for chzzk.naver.com
+def listen_to_ch(uid, origin_file): # Main function
+    global flags
+    flags[uid] = True
+    
+    print_w_uid = lambda x: print(uid + ': ' + x) # Print the given message with the UID
 
-    print('Loading Commands...')
+    print_w_uid('Loading Commands...')
     commands = {}
-    commands_file = os.path.join(os.path.dirname(my_file), 'commands.csv')
+    commands_file = os.path.join(os.path.dirname(origin_file), 'commands_' + uid + '.csv')
     if not os.path.exists(commands_file): # If the file does not exist, print an error message and exit the program
-        print('Commands file not found. Please create a file named "commands.csv" in the same directory as this script.')
-        sys.exit(1)
-
+        f = open(commands_file, 'w')
+        f.write('command,response\n')
+        f.close()
+        
     commands_data = pandas.read_csv(commands_file)
     for i in range(len(commands_data)):
         commands[commands_data['command'][i]] = commands_data['response'][i]
 
-    moderator = []
-    moderator_file = os.path.join(os.path.dirname(my_file), 'moderators.csv')
-    if not os.path.exists(moderator_file): # If the file does not exist, print an error message and exit the program
-        print('Moderators file not found. Please create a file named "moderators.csv" in the same directory as this script.')
-        my_exit(1)
-    
-    moderator_data = pandas.read_csv(moderator_file)
-    for i in range(len(moderator_data)):
-        moderator.append(moderator_data['name'][i])
-
-    print('Loading auth file...') # chzzk_auth.csv
-    auth_file = os.path.join(os.path.dirname(my_file), 'chzzk_auth.csv')
+    print_w_uid('Loading auth file...') # chzzk_auth.csv
+    auth_file = os.path.join(os.path.dirname(origin_file), 'chzzk_auth_' + uid + '.csv')
     if not os.path.exists(auth_file): # If the file does not exist, print an error message and exit the program
-        print('Auth file not found. Please create a file named "chzzk_auth.csv" in the same directory as this script.')
-        my_exit(1)
+        f = open(auth_file, 'w')
+        f.write('bot_id,bot_pw\n')
+        f.close()
 
     auth_data = pandas.read_csv(auth_file, nrows=1)
-    if auth_data.empty: # If the file is empty, print an error message and exit the program
-        print('Auth file is empty. Please fill in the required fields.')
-        my_exit(1)
 
-    chzzk_uid = auth_data['chzzk_uid'][0]
-    bot_id = auth_data['bot_id'][0]
-    bot_pw = auth_data['bot_pw'][0]
+    bot_id = auth_data['bot_id'][0] if len(auth_data['bot_id']) > 0 else ''
+    bot_pw = auth_data['bot_pw'][0] if len(auth_data['bot_pw']) > 0 else ''
 
-    print('Loading chat...') # Open the chat page
-    dest_ch = 'https://chzzk.naver.com/live/' + chzzk_uid + '/chat'
+    print_w_uid('Loading chat...') # Open the chat page
+    dest_ch = 'https://chzzk.naver.com/live/' + uid + '/chat'
     naver_login = 'https://nid.naver.com/nidlogin.login'
     naver_main = 'https://www.naver.com/'
+    broadcast_info = 'https://studio.chzzk.naver.com/' + uid + '/live'
+    blocklist_info = 'https://studio.chzzk.naver.com/' + uid + '/blocklist'
 
     driver = webdriver.Chrome()
     driver.get(naver_login)
@@ -88,36 +91,42 @@ def main(my_file): # Main function
     driver.find_element(By.XPATH,'//*[@id="log.login"]').click()
     
     while driver.current_url != naver_main:
-        print('Please manually log in to Naver and go to the Naver main page...')
+        print_w_uid('Please manually log in to Naver and go to the Naver main page...')
         time.sleep(5)
     time.sleep(2)
 
     try:
         driver.find_element(By.CSS_SELECTOR, '[class="MyView-module__desc_email___JwAKa"] ')
     except:
-        print('Login failed. Please check your ID and password.')
+        print_w_uid('Login failed. Please check your ID and password.')
         driver.quit()
         my_exit(1)
 
     driver.get(dest_ch)
 
-    print('Chat loaded.') # The chat is now loaded
-    print('Listening...') # The program is now listening to the chat
+    print_w_uid('Chat loaded.') # The chat is now loaded
+    print_w_uid('Listening...') # The program is now listening to the chat
 
     prv_chat = []
-    while flag:
+    while flags[uid]:
         try:
             bs = BeautifulSoup(driver.page_source, 'html.parser')
             chat = bs.select('button.live_chatting_message_wrapper__xpYre')
             time.sleep(1)
         except:
-            print('An error occurred while getting the chat. Please check your internet connection.')
+            print_w_uid('An error occurred while getting the chat. Please check your internet connection.')
             try:
                 driver.quit()
             except:
                 pass
             my_exit(1)
         
+        if len(chat) < len(prv_chat): # If the chat is not loaded, wait for 5 seconds
+            driver.refresh()
+            prv_chat = []
+            time.sleep(1)
+            continue
+
         if prv_chat == []: # If there is no previous chat, set the previous chat to the current chat
             prv_chat = chat
             continue
@@ -125,14 +134,18 @@ def main(my_file): # Main function
         if chat != prv_chat: # If there is a new chat, check if it is a command
             for i in range(len(chat) - len(prv_chat), 0, -1): # Check the new chat from the end
                 cur_chat = chat[-i]
+
+                is_user_mod = cur_chat.find('img', alt='스트리머') or cur_chat.find('img', alt='채널 관리자')
+                is_user_tiny_mod = cur_chat.find('img', alt='채팅 운영자')
+
                 cur_user = cur_chat.select('span.live_chatting_username_nickname__dDbbj')[0].text.rstrip(':')
                 cur_msg = cur_chat.select('span.live_chatting_message_text__DyleH')[0].text
                 cur_command = len(cur_msg.split()) > 0 and cur_msg.split()[0] or ''
                 
-                if cur_command == "!추가":
-                    if cur_user not in moderator:
+                if cur_command == "!추가": # If the command is '!추가', add the command
+                    if not is_user_mod and not is_user_tiny_mod:
                         continue
-                    
+                
                     if len(cur_msg.split()) < 3:
                         continue
 
@@ -141,65 +154,221 @@ def main(my_file): # Main function
                     commands[new_command] = new_response
                     commands_data = pandas.DataFrame(commands.items(), columns=['command', 'response'])
                     commands_data.to_csv(commands_file, index=False)
-                    print('Command added: ' + new_command + ' -> ' + new_response)
+                    print_w_uid('Command added: ' + new_command + ' -> ' + new_response)
 
                     chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                     chat_input.click()
-                    new_chat_input = driver.find_element(By.CLASS_NAME, 'live_chatting_input_input__2F3Et')
+                    new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                     new_chat_input.send_keys('명령어가 추가되었습니다: ' + new_command + ' -> ' + new_response)
                     new_chat_input.send_keys(Keys.ENTER)
-                    
-                    break
-            
-                elif cur_command == "!삭제":
-                    if cur_user not in moderator:
+
+                elif cur_command == "!삭제": # If the command is '!삭제', delete the command
+                    if not is_user_mod and not is_user_tiny_mod:
                         continue
 
                     if len(cur_msg.split()) < 2:
                         continue
 
                     del_command = cur_msg.split()[1]
-                    if del_command in commands:
+                    if del_command in commands: # If the command exists, delete the command
                         del commands[del_command]
                         commands_data = pandas.DataFrame(commands.items(), columns=['command', 'response'])
                         commands_data.to_csv(commands_file, index=False)
-                        print('Command deleted: ' + del_command)
+                        print_w_uid('Command deleted: ' + del_command)
 
                         chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                         chat_input.click()
-                        new_chat_input = driver.find_element(By.CLASS_NAME, 'live_chatting_input_input__2F3Et')
+                        new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                         new_chat_input.send_keys('명령어가 삭제되었습니다: ' + del_command)
                         new_chat_input.send_keys(Keys.ENTER)
 
-                    else:
+                    else: # If the command does not exist, print an error message
                         chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                         chat_input.click()
-                        new_chat_input = driver.find_element(By.CLASS_NAME, 'live_chatting_input_input__2F3Et')
+                        new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                         new_chat_input.send_keys('삭제할 명령어가 존재하지 않습니다: ' + del_command)
                         new_chat_input.send_keys(Keys.ENTER)    
-                    
-                    break
+                
+                elif cur_command == "!밴": # If the command is '!밴', ban the user
+                    if not is_user_mod:
+                        continue
 
-                elif cur_command in commands:
+                    if len(cur_msg.split()) < 2:
+                        continue
+                    
+                    ban_user = cur_msg.split()[1]
+                    print_w_uid('Banning user: ' + ban_user)
+                    driver.get(blocklist_info)
+                    time.sleep(2)
+
+                    if driver.find_element(By.XPATH, '//*[text()="이 페이지를 이용할 수 있는 권한이 없습니다."]'):
+                        driver.get(dest_ch)
+                        time.sleep(1)
+                        continue
+
+                    blocklist = driver.find_element(By.CSS_SELECTOR, '[placeholder="닉네임 또는 UID를 입력해주세요"]')
+                    blocklist.click()
+                    new_blocklist = driver.find_element(By.CSS_SELECTOR, '[pladceholder="닉네임 또는 UID를 입력해주세요"]')
+                    new_blocklist.send_keys(Keys.CONTROL, 'a')
+                    new_blocklist.send_keys(Keys.DELETE)
+                    new_blocklist.send_keys(ban_user)
+                    new_blocklist.send_keys(Keys.ENTER)
+                    time.sleep(1)
+                    driver.get(dest_ch)
+                    time.sleep(1)
+                    
                     chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                     chat_input.click()
-                    new_chat_input = driver.find_element(By.CLASS_NAME, 'live_chatting_input_input__2F3Et')
+                    new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
+                    new_chat_input.send_keys('밴을 시도했습니다: ' + ban_user)
+                    new_chat_input.send_keys(Keys.ENTER)
+                
+                elif cur_command == "!방제": # If the command is '!방제', change the title of the broadcast
+                    if not is_user_mod:
+                        continue
+                    
+                    if len(cur_msg.split()) < 2:
+                        continue
+
+                    new_title_name = ' '.join(cur_msg.split()[1:])
+                    print_w_uid('Changing broadcast title: ' + new_title_name)
+                    driver.get(broadcast_info)
+                    time.sleep(2)
+
+                    try:
+                        driver.find_element(By.XPATH, '//*[text()="이 페이지를 이용할 수 있는 권한이 없습니다."]')
+                        driver.get(dest_ch)
+                        time.sleep(1)
+                        continue
+                    except:
+                        pass
+
+                    title = driver.find_element(By.CSS_SELECTOR, '[placeholder="방송 제목을 입력해주세요."]')
+                    title.click()
+                    new_title = driver.find_element(By.CSS_SELECTOR, '[placeholder="방송 제목을 입력해주세요."]')
+                    new_title.send_keys(Keys.CONTROL, 'a')
+                    new_title.send_keys(Keys.DELETE)
+                    new_title.send_keys(new_title_name)
+                    time.sleep(1)
+                    upate_btn = driver.find_element(By.CLASS_NAME, 'live_form_footer__lDYmf').find_element(By.CSS_SELECTOR, 'button')
+                    
+                    try:
+                        upate_btn.click()
+                    except:
+                        pass
+
+                    driver.get(dest_ch)
+                    time.sleep(2)
+                    
+                    chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
+                    chat_input.click()
+                    new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
+                    new_chat_input.send_keys('방제 변경을 시도했습니다: ' + new_title_name)
+                    new_chat_input.send_keys(Keys.ENTER)
+
+                elif cur_command == "!게임": # If the command is '!게임', change the game of the broadcast
+                    if not is_user_mod:
+                        continue
+
+                    if len(cur_msg.split()) < 2:
+                        continue
+
+                    new_game_name = ' '.join(cur_msg.split()[1:])
+                    print_w_uid('Changing broadcast game: ' + new_game_name)
+                    driver.get(broadcast_info)
+                    time.sleep(2)
+
+                    try:
+                        driver.find_element(By.XPATH, '//*[text()="이 페이지를 이용할 수 있는 권한이 없습니다."]')
+                        driver.get(dest_ch)
+                        time.sleep(1)
+                        continue
+                    except:
+                        pass
+
+                    game = driver.find_element(By.CSS_SELECTOR, '[placeholder="카테고리 검색"]')
+                    game.click()
+                    new_game = driver.find_element(By.CSS_SELECTOR, '[placeholder="카테고리 검색"]')
+                    new_game.send_keys(Keys.CONTROL, 'a')
+                    new_game.send_keys(Keys.DELETE)
+                    new_game.send_keys(new_game_name)
+                    time.sleep(1)
+                    searched_game = driver.find_element(By.CSS_SELECTOR, '[role="listbox"]')
+                    searched_game.click()
+
+                    time.sleep(1)
+                    upate_btn = driver.find_element(By.CLASS_NAME, 'live_form_footer__lDYmf').find_element(By.CSS_SELECTOR, 'button')
+                    
+                    try:
+                        upate_btn.click()
+                    except:
+                        pass
+
+                    driver.get(dest_ch)
+                    time.sleep(2)
+
+                    chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
+                    chat_input.click()
+                    new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
+                    new_chat_input.send_keys('게임 변경을 시도했습니다: ' + new_game_name)
+                    new_chat_input.send_keys(Keys.ENTER)
+
+                elif cur_command in commands: # If the command exists, execute the command
+                    print_w_uid('Command detected: ' + cur_command)
+                    chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
+                    chat_input.click()
+                    new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                     new_chat_input.send_keys(commands[cur_command])
                     new_chat_input.send_keys(Keys.ENTER)
 
-                    break
+                else:
+                    continue
+
+                break
                 
             prv_chat = chat
         time.sleep(5)
 
-    print('Closing GlitchCat...') # The program is now closing
+    print_w_uid('Closing Thread...') # The program is now closing
     driver.quit()
-    if sys.platform == 'win32':
-        win_unicode_console.disable()
-    my_exit(0)
         
+def main(file_path):
+    global flags
+    flags = {}
 
-main_th = threading.Thread(target=main, args=(os.path.abspath(__file__),))
+    global gflag
+    gflag = True
+    print('Welcome to GlitchCat!')
+
+    uids = []
+    uids_path = os.path.join(os.path.dirname(file_path), 'uids.csv')
+    if not os.path.exists(uids_path): # If the file does not exist, print an error message and exit the program
+        f = open(uids_path, 'w')
+        f.write('uid\n')
+        f.close()
+
+    uids_data = pandas.read_csv(uids_path)
+    for i in range(len(uids_data)):
+        uids.append(uids_data['uid'][i])
+
+    for uid in uids:
+        flags[uid] = True
+        threading.Thread(target=listen_to_ch, args=(uid, file_path, )).start()
+    
+    if len(uids) == 0: # If there are no UIDs, print an error message and exit the program
+        print('No UIDs found. Please add UIDs to uids.csv and restart the program.')
+        try:
+            input_th.join()
+        except:
+            pass
+        my_exit(1)
+
+    while gflag:
+        time.sleep(5)
+
+    print('Closing GlitchCat...')
+
+main_th = threading.Thread(target=main, args=(__file__,))
 input_th = threading.Thread(target=get_input)
 main_th.start()
 input_th.start()
