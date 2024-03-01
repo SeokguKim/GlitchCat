@@ -17,10 +17,17 @@ if sys.platform == 'win32':
 def my_exit(exit_code, uid): # Exit the program and disable the unicode console if it is enabled
     if sys.platform == 'win32':
         win_unicode_console.disable()
-    sys.exit(exit_code)
-    if exit_code == 1: # If the exit code is 1, close the program
-        if input_th.is_alive():
+    
+    if exit_code == 2: # If the exit code is 1, close the program
+        try:
             input_th.join()
+        except:
+            pass
+    
+    if exit_code > 0:
+        print('An error occurred.' + (uid and ' (UID: ' + uid + ')' or '') + ' The program will now close.')
+
+    sys.exit(exit_code)
 
 def get_input(): # Get the user input
     global flags
@@ -101,7 +108,7 @@ def listen_to_ch(uid, origin_file): # Main function
     except:
         print_w_uid('Login failed. Please check your ID and password.')
         driver.quit()
-        my_exit(1)
+        my_exit(1, uid)
 
     driver.get(dest_ch)
 
@@ -121,13 +128,13 @@ def listen_to_ch(uid, origin_file): # Main function
                 driver.quit()
             except:
                 pass
-            my_exit(1)
+            my_exit(1, uid)
         
-        if len(chat) < len(prv_chat): # If the chat is not loaded, wait for 5 seconds
+        refresh_counter -= 1
+        if refresh_counter == 0: # If the refresh counter is 0, refresh the page
             driver.refresh()
+            refresh_counter = 60
             prv_chat = []
-            time.sleep(1)
-            continue
 
         if prv_chat == []: # If there is no previous chat, set the previous chat to the current chat
             prv_chat = chat
@@ -327,11 +334,9 @@ def listen_to_ch(uid, origin_file): # Main function
                     continue
 
                 break
-            refresh_counter -= 1
-            if refresh_counter == 0: # If the refresh counter is 0, refresh the chat
-                driver.refresh()
-                refresh_counter = 60
+
             prv_chat = chat
+            
         time.sleep(5)
 
     print_w_uid('Closing Thread...') # The program is now closing
@@ -363,11 +368,7 @@ def main(file_path):
     
     if len(uids) == 0: # If there are no UIDs, print an error message and exit the program
         print('No UIDs found. Please add UIDs to uids.csv and restart the program.')
-        try:
-            input_th.join()
-        except:
-            pass
-        my_exit(1)
+        my_exit(2, 'main')
 
     while gflag:
         time.sleep(5)
