@@ -108,6 +108,7 @@ def listen_to_ch(uid, origin_file): # Main function
     print_w_uid('Chat loaded.') # The chat is now loaded
     print_w_uid('Listening...') # The program is now listening to the chat
 
+    refresh_counter = 60
     prv_chat = []
     while flags[uid]:
         try:
@@ -151,7 +152,7 @@ def listen_to_ch(uid, origin_file): # Main function
                         continue
 
                     new_command = cur_msg.split()[1]
-                    new_response = ' '.join(cur_msg.split()[2:])
+                    new_response = ' '.join(cur_msg.split(' ')[2:])
                     commands[new_command] = new_response
                     commands_data = pandas.DataFrame(commands.items(), columns=['command', 'response'])
                     commands_data.to_csv(commands_file, index=False)
@@ -326,7 +327,10 @@ def listen_to_ch(uid, origin_file): # Main function
                     continue
 
                 break
-                
+            refresh_counter -= 1
+            if refresh_counter == 0: # If the refresh counter is 0, refresh the chat
+                driver.refresh()
+                refresh_counter = 60
             prv_chat = chat
         time.sleep(5)
 
