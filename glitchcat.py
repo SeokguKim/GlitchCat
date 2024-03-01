@@ -90,7 +90,7 @@ def listen_to_ch(uid, origin_file): # Main function
     driver.find_element(By.CSS_SELECTOR, '#pw').send_keys(Keys.CONTROL, 'v')
     pyperclip.copy('')
     driver.find_element(By.XPATH,'//*[@id="log.login"]').click()
-    
+
     while driver.current_url != naver_main:
         print_w_uid('Please manually log in to Naver and go to the Naver main page...')
         time.sleep(5)
@@ -359,6 +359,7 @@ def main(file_path):
     for uid in uids:
         flags[uid] = True
         threading.Thread(target=listen_to_ch, args=(uid, file_path, )).start()
+        time.sleep(1)
     
     if len(uids) == 0: # If there are no UIDs, print an error message and exit the program
         print('No UIDs found. Please add UIDs to uids.csv and restart the program.')
