@@ -67,7 +67,7 @@ def get_input(file_path): # Get the user input
             else:
                 if re.match(r'^[a-z0-9]{32}$', uid):
                     flags[uid] = True
-                    threading.Thread(target=listen_to_ch, args=(uid, __file__, )).start()
+                    threading.Thread(target=listen_to_ch, args=(uid, file_path, )).start()
                 else:
                     print('Invalid UID.')
         else:
