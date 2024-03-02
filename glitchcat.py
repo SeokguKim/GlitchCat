@@ -62,7 +62,7 @@ def get_input(file_path): # Get the user input
     elif user_input.split()[0] == 'n': # If the user input is 'n', start a new thread with the given UID
         if len(user_input.split()) > 1:
             uid = user_input.split()[1]
-            if uid in flags:
+            if uid in flags and flags[uid] == True:
                 print('The thread with the given UID is already running.')
             else:
                 if re.match(r'^[a-z0-9]{32}$', uid):
