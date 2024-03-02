@@ -10,6 +10,7 @@ import os
 import time
 import threading
 import requests
+import re
 if sys.platform == 'win32':
     import win_unicode_console
     win_unicode_console.enable()
@@ -18,18 +19,25 @@ def my_exit(exit_code, uid): # Exit the program and disable the unicode console 
     if sys.platform == 'win32':
         win_unicode_console.disable()
     
-    if exit_code == 2: # If the exit code is 1, close the program
-        try:
-            input_th.join()
-        except:
-            pass
-    
-    if exit_code > 0:
+    if exit_code == 1: # If the exit code is 1, close the program
+        print('The program will now close.')
+        for thread in threading.enumerate():
+            if thread.name != 'MainThread':
+                thread.join()
+
+    elif exit_code == 2: # If the exit code is 2, print an error message
         print('An error occurred.' + (uid and ' (UID: ' + uid + ')' or '') + ' The program will now close.')
 
+    elif exit_code == 3: # If the exit code is 3, restart the program
+        for thread in threading.enumerate():
+            if thread.name != 'MainThread':
+                thread.join()
+        os.execl(sys.executable, sys.executable, *sys.argv)
+    
+    
     sys.exit(exit_code)
 
-def get_input(): # Get the user input
+def get_input(file_path): # Get the user input
     global flags
     global gflag
     user_input = sys.stdin.readline().rstrip()
@@ -41,14 +49,59 @@ def get_input(): # Get the user input
     elif user_input.split()[0] == 'q': # If the user input is 'q', close the thread with the given UID
         if len(user_input.split()) > 1:
             uid = user_input.split()[1]
+
             if uid in flags:
                 flags[uid] = False
             else:
-                print('Invalid UID or the thread has already been closed.')
+                if re.match(r'^[a-z0-9]{32}$', uid):
+                    print('The thread with the given UID is already running.')
+                else:
+                    print('Invalid UID.')
         else:
             print('Invalid UID or the thread has already been closed.')
-    
-    threading.Thread(target=get_input).start()
+    elif user_input.split()[0] == 'n': # If the user input is 'n', start a new thread with the given UID
+        if len(user_input.split()) > 1:
+            uid = user_input.split()[1]
+            if uid in flags:
+                print('The thread with the given UID is already running.')
+            else:
+                if re.match(r'^[a-z0-9]{32}$', uid):
+                    flags[uid] = True
+                    threading.Thread(target=listen_to_ch, args=(uid, __file__, )).start()
+                else:
+                    print('Invalid UID.')
+        else:
+            print('Invalid UID.')
+    elif user_input.split()[0] == 'l': # If the user input is 'l', list all reunning threads
+        print('Running Threads:')
+        for uid in flags:
+            print(uid)
+    elif user_input.split()[0] == 'u': # If the user input is 'u', update the UID files and restart the program
+        uids_path = os.path.join(os.path.dirname(file_path), 'uids.csv')
+        if not os.path.exists(uids_path):
+            f = open(uids_path, 'w')
+            f.write('uid\n')
+            f.close()
+        uids_data = pandas.read_csv(uids_path)
+        uids = []
+        for i in range(len(uids_data)):
+            uids.append(uids_data['uid'][i])
+        for uid in flags:
+            if uid not in uids:
+                uids.append(uid)
+        uids_data = pandas.DataFrame(uids, columns=['uid'])
+        uids_data.to_csv(uids_path, index=False)
+        my_exit(3, 'main')
+    elif user_input == 'h' or user_input == 'help': # If the user input is 'h' or 'help', show the help message
+        print('Commands:')
+        print('q [UID] - Quit the thread with the given UID')
+        print('n [UID] - Start a new thread with the given UID')
+        print('l - List all running threads')
+        print('u - Update the UID files and restart the program')
+        print('qa - Quit all threads and close the program')
+        print('h or help - Show this message')
+
+    threading.Thread(target=get_input, args=(file_path,)).start() # Start a new thread to get the user input
 
 def listen_to_ch(uid, origin_file): # Main function
     global flags
@@ -108,7 +161,7 @@ def listen_to_ch(uid, origin_file): # Main function
     except:
         print_w_uid('Login failed. Please check your ID and password.')
         driver.quit()
-        my_exit(1, uid)
+        my_exit(2, uid)
 
     driver.get(dest_ch)
 
@@ -128,7 +181,7 @@ def listen_to_ch(uid, origin_file): # Main function
                 driver.quit()
             except:
                 pass
-            my_exit(1, uid)
+            my_exit(2, uid)
         
         refresh_counter -= 1
         if refresh_counter == 0: # If the refresh counter is 0, refresh the page
@@ -361,14 +414,17 @@ def main(file_path):
     for i in range(len(uids_data)):
         uids.append(uids_data['uid'][i])
 
-    for uid in uids:
+    for uid in uids: # Start a new thread for each UID
+        if not re.match(r'^[a-z0-9]{32}$', uid):
+            print('Invalid UID: ' + uid)
+            continue
         flags[uid] = True
         threading.Thread(target=listen_to_ch, args=(uid, file_path, )).start()
         time.sleep(1)
     
     if len(uids) == 0: # If there are no UIDs, print an error message and exit the program
-        print('No UIDs found. Please add UIDs to uids.csv and restart the program.')
-        my_exit(2, 'main')
+        print('No UIDs found. Please update the UID files and restart the program.')
+        my_exit(1, 'main')
 
     while gflag:
         time.sleep(5)
@@ -376,6 +432,6 @@ def main(file_path):
     print('Closing GlitchCat...')
 
 main_th = threading.Thread(target=main, args=(__file__,))
-input_th = threading.Thread(target=get_input)
+input_th = threading.Thread(target=get_input, args=(__file__,))
 main_th.start()
 input_th.start()
