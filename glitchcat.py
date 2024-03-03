@@ -170,6 +170,9 @@ def listen_to_ch(uid, origin_file): # Main function
 
     refresh_counter = 60
     prv_chat = []
+    
+    send_text = lambda driver, text, element: driver.execute_script(f'arguments[0].innerText = "{text}"', element) # Send the given text to the chat
+    
     while flags[uid]:
         try:
             bs = BeautifulSoup(driver.page_source, 'html.parser')
@@ -221,7 +224,7 @@ def listen_to_ch(uid, origin_file): # Main function
                     chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                     chat_input.click()
                     new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
-                    new_chat_input.send_keys('명령어가 추가되었습니다: ' + new_command + ' -> ' + new_response)
+                    send_text(driver, '명령어가 추가되었습니다: ' + new_command + ' -> ' + new_response, new_chat_input)
                     new_chat_input.send_keys(Keys.ENTER)
 
                 elif cur_command == "!삭제": # If the command is '!삭제', delete the command
@@ -310,7 +313,7 @@ def listen_to_ch(uid, origin_file): # Main function
                     new_title = driver.find_element(By.CSS_SELECTOR, '[placeholder="방송 제목을 입력해주세요."]')
                     new_title.send_keys(Keys.CONTROL, 'a')
                     new_title.send_keys(Keys.DELETE)
-                    new_title.send_keys(new_title_name)
+                    send_text(driver, new_title_name, new_title)
                     time.sleep(1)
                     upate_btn = driver.find_element(By.CLASS_NAME, 'live_form_footer__lDYmf').find_element(By.CSS_SELECTOR, 'button')
                     
@@ -325,7 +328,7 @@ def listen_to_ch(uid, origin_file): # Main function
                     chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                     chat_input.click()
                     new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
-                    new_chat_input.send_keys('방제 변경을 시도했습니다: ' + new_title_name)
+                    send_text(driver, '방제 변경을 시도했습니다: ' + new_title_name, new_chat_input)
                     new_chat_input.send_keys(Keys.ENTER)
 
                 elif cur_command == "!게임": # If the command is '!게임', change the game of the broadcast
@@ -380,7 +383,7 @@ def listen_to_ch(uid, origin_file): # Main function
                     chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
                     chat_input.click()
                     new_chat_input = driver.find_element(By.CSS_SELECTOR, '[placeholder="채팅을 입력해주세요"]')
-                    new_chat_input.send_keys(commands[cur_command])
+                    send_text(driver, commands[cur_command], new_chat_input)
                     new_chat_input.send_keys(Keys.ENTER)
 
                 else:
