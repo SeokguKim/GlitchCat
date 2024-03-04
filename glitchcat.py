@@ -100,6 +100,8 @@ def get_input(file_path): # Get the user input
         print('u - Update the UID files and restart the program')
         print('qa - Quit all threads and close the program')
         print('h or help - Show this message')
+    else: # If the user input is invalid, print an error message
+        print('Invalid command. Type h or help for help.')
 
     threading.Thread(target=get_input, args=(file_path,)).start() # Start a new thread to get the user input
 
