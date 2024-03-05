@@ -263,7 +263,7 @@ def listen_to_ch(uid, origin_file): # Main function
                     if len(cur_msg.split()) < 2:
                         continue
                     
-                    ban_user = cur_msg.split()[1]
+                    ban_user = ' '.join(cur_msg.split()[1:])
                     print_w_uid('Banning user: ' + ban_user)
                     driver.get(blocklist_info)
                     time.sleep(2)
@@ -315,7 +315,7 @@ def listen_to_ch(uid, origin_file): # Main function
                     new_title = driver.find_element(By.CSS_SELECTOR, '[placeholder="방송 제목을 입력해주세요."]')
                     new_title.send_keys(Keys.CONTROL, 'a')
                     new_title.send_keys(Keys.DELETE)
-                    send_text(driver, new_title_name, new_title)
+                    new_title.send_keys(new_title_name)
                     time.sleep(1)
                     upate_btn = driver.find_element(By.CLASS_NAME, 'live_form_footer__lDYmf').find_element(By.CSS_SELECTOR, 'button')
                     
